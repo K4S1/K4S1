@@ -7,20 +7,38 @@ set -Eeuo pipefail
 
 # Packages by logical name. Keep these conservative and cross-distro.
 COMMON_PKGS=(
-  curl wget git vim tmux unzip zip ca-certificates gnupg
-  htop tree jq ripgrep fd-find
+  curl 
+  wget 
+  git
+  vim
+  nvim
+  tmux
+  unzip
+  zip
+  ca-certificates
+  gnupg
+  bpytop
+  tree
+  jq
+  ripgrep
+  fd-find
+  speedtest-cli
+  speedometer
+  dnsutils
 )
 
 # Ubuntu-only additions (names in apt)
 UBUNTU_PKGS=(
   build-essential
-  python3 python3-pip
+  python3
+  python3-pip
 )
 
 # Arch-only additions (names in pacman)
 ARCH_PKGS=(
   base-devel
-  python python-pip
+  python
+  python-pip
 )
 
 # Optional tools you may install via other methods
