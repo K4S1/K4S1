@@ -21,10 +21,8 @@ COMMON_PKGS=(
   tree
   jq
   ripgrep
-  fd-find
   speedtest-cli
   speedometer
-  dnsutils
 )
 
 # Ubuntu-only additions (names in apt)
@@ -32,6 +30,9 @@ UBUNTU_PKGS=(
   build-essential
   python3
   python3-pip
+  dnsutils 
+  fd-find 
+  neovim
 )
 
 # Arch-only additions (names in pacman)
