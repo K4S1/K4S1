@@ -11,7 +11,6 @@ COMMON_PKGS=(
   wget 
   git
   vim
-  nvim
   tmux
   unzip
   zip
