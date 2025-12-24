@@ -93,8 +93,8 @@ detect_os_id() {
 # ----------------------------
 # Package lists (mapped per distro)
 # ----------------------------
-APT_BASE_PKGS=( curl wget git vim tmux unzip zip ca-certificates gnupg tree jq ripgrep dialog )
-PACMAN_BASE_PKGS=( curl wget git vim tmux unzip zip ca-certificates gnupg tree jq ripgrep dialog )
+APT_BASE_PKGS=( curl wget git vim tmux unzip zip ca-certificates gnupg tree jq ripgrep dialog neofetch )
+PACMAN_BASE_PKGS=( curl wget git vim tmux unzip zip ca-certificates gnupg tree jq ripgrep dialog neofetch )
 
 APT_FD_PKGS=( fd-find )
 PACMAN_FD_PKGS=( fd )
