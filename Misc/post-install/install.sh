@@ -118,49 +118,77 @@ prompt_yn() {
 menu_select_components() {
   [[ "$NONINTERACTIVE" == "1" ]] && return 0
 
-  # Hvis vi ikke har en TTY, kan whiptail ikke køre korrekt (typisk ved curl | bash)
-  if [[ ! -t 0 && ! -t 1 ]]; then
-    warn "Ingen TTY til menu (typisk ved 'curl | bash'). Sætter NONINTERACTIVE=1."
+  # Kræv en rigtig TTY til interaktiv menu
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    warn "Ingen TTY til menu (typisk ved pipe/CI). Skifter til NONINTERACTIVE=1."
     NONINTERACTIVE=1
     return 0
   fi
 
-  if have_cmd whiptail; then
-    local choices
-    choices=$(whiptail --title "Post-install" --checklist \
-      "Vælg hvad der skal installeres (SPACE for at vælge/fravælge)" 20 78 10 \
-      "BASE"     "Grundpakker (curl/git/vim/tmux/jq/ripgrep...)" ON \
-      "FD"       "fd (fd-find/fd) + evt symlink på Debian" ON \
-      "EDITOR"   "neovim" ON \
-      "DEV"      "build tools + python/pip" ON \
-      "NETTOOLS" "dns tools + nmap + mtr + speedtest" ON \
-      "EXTRAS"   "ekstra (htop/bpytop/speedometer...)" OFF \
-      "DOCKER"   "Docker (tilvalg)" OFF \
-      "DOTFILES" "Dotfiles (~/.thedot via SSH-key ~/.ssh/github)" OFF \
-      3>&1 1>&2 2>&3 </dev/tty ) || return 0
+  # Gør terminalen “sane” og sæt et sikkert TERM (for arrow keys)
+  export TERM="${TERM:-xterm}"
+  stty sane </dev/tty || true
 
-    INSTALL_BASE=0 INSTALL_FD=0 INSTALL_EDITOR=0 INSTALL_DEV=0 INSTALL_NETTOOLS=0 INSTALL_EXTRAS=0 INSTALL_DOCKER=0 INSTALL_DOTFILES=0
-    [[ "$choices" == *"BASE"* ]]     && INSTALL_BASE=1
-    [[ "$choices" == *"FD"* ]]       && INSTALL_FD=1
-    [[ "$choices" == *"EDITOR"* ]]   && INSTALL_EDITOR=1
-    [[ "$choices" == *"DEV"* ]]      && INSTALL_DEV=1
-    [[ "$choices" == *"NETTOOLS"* ]] && INSTALL_NETTOOLS=1
-    [[ "$choices" == *"EXTRAS"* ]]   && INSTALL_EXTRAS=1
-    [[ "$choices" == *"DOCKER"* ]]   && INSTALL_DOCKER=1
-    [[ "$choices" == *"DOTFILES"* ]] && INSTALL_DOTFILES=1
+  # Defaults hvis bruger cancel'er
+  local choices=""
+  local height=20 width=78 listheight=10
+
+  if have_cmd dialog; then
+    # dialog skriver typisk til stderr; --stdout giver os resultatet på stdout
+    choices=$(
+      dialog --title "Post-install" --checklist \
+        "Vælg hvad der skal installeres (SPACE for at vælge/fravælge)" \
+        $height $width $listheight \
+        BASE     "Grundpakker (curl/git/vim/tmux/jq/ripgrep...)" on \
+        FD       "fd (fd-find/fd) + evt symlink på Debian" on \
+        EDITOR   "neovim" on \
+        DEV      "build tools + python/pip" on \
+        NETTOOLS "dns tools + nmap + mtr + speedtest" on \
+        EXTRAS   "ekstra (htop/bpytop/speedometer...)" off \
+        DOCKER   "Docker (tilvalg)" off \
+        DOTFILES "Dotfiles (~/.thedot via SSH-key ~/.ssh/github)" off \
+        --stdout \
+        </dev/tty >/dev/tty
+    ) || return 0
+
+  elif have_cmd whiptail; then
+    # whiptail: brug /dev/tty og korrekt fd-swap
+    choices=$(
+      whiptail --title "Post-install" --checklist \
+        "Vælg hvad der skal installeres (SPACE for at vælge/fravælge)" \
+        $height $width $listheight \
+        BASE     "Grundpakker (curl/git/vim/tmux/jq/ripgrep...)" ON \
+        FD       "fd (fd-find/fd) + evt symlink på Debian" ON \
+        EDITOR   "neovim" ON \
+        DEV      "build tools + python/pip" ON \
+        NETTOOLS "dns tools + nmap + mtr + speedtest" ON \
+        EXTRAS   "ekstra (htop/bpytop/speedometer...)" OFF \
+        DOCKER   "Docker (tilvalg)" OFF \
+        DOTFILES "Dotfiles (~/.thedot via SSH-key ~/.ssh/github)" OFF \
+        3>&1 1>&2 2>&3 \
+        </dev/tty >/dev/tty
+    ) || return 0
+
+  else
+    warn "Hverken dialog eller whiptail er tilgængelig. Skifter til NONINTERACTIVE=1."
+    NONINTERACTIVE=1
     return 0
   fi
 
-  # Fallback prompts på TTY
-  prompt_yn "Installér BASE?"     INSTALL_BASE </dev/tty
-  prompt_yn "Installér FD?"       INSTALL_FD </dev/tty
-  prompt_yn "Installér EDITOR?"   INSTALL_EDITOR </dev/tty
-  prompt_yn "Installér DEV?"      INSTALL_DEV </dev/tty
-  prompt_yn "Installér NETTOOLS?" INSTALL_NETTOOLS </dev/tty
-  prompt_yn "Installér EXTRAS?"   INSTALL_EXTRAS </dev/tty
-  prompt_yn "Installér DOCKER?"   INSTALL_DOCKER </dev/tty
-  prompt_yn "Installér DOTFILES?" INSTALL_DOTFILES </dev/tty
+  # Reset og sæt flags baseret på valg
+  INSTALL_BASE=0 INSTALL_FD=0 INSTALL_EDITOR=0 INSTALL_DEV=0 INSTALL_NETTOOLS=0 INSTALL_EXTRAS=0 INSTALL_DOCKER=0 INSTALL_DOTFILES=0
+
+  # dialog returnerer typisk: "BASE" "FD" ... (med anførselstegn)
+  [[ "$choices" == *"BASE"* ]]     && INSTALL_BASE=1
+  [[ "$choices" == *"FD"* ]]       && INSTALL_FD=1
+  [[ "$choices" == *"EDITOR"* ]]   && INSTALL_EDITOR=1
+  [[ "$choices" == *"DEV"* ]]      && INSTALL_DEV=1
+  [[ "$choices" == *"NETTOOLS"* ]] && INSTALL_NETTOOLS=1
+  [[ "$choices" == *"EXTRAS"* ]]   && INSTALL_EXTRAS=1
+  [[ "$choices" == *"DOCKER"* ]]   && INSTALL_DOCKER=1
+  [[ "$choices" == *"DOTFILES"* ]] && INSTALL_DOTFILES=1
 }
+
 
 
 print_plan() {
