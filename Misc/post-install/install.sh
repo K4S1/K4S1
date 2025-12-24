@@ -313,12 +313,21 @@ has_github_ssh_key() {
 }
 
 can_access_github_ssh() {
-  local user="$1" home key
+  local user="$1" home key out
   home="$(getent passwd "$user" | cut -d: -f6)"
   key="${home}/.ssh/${DOTFILES_KEY_NAME}"
-  sudo -u "$user" ssh \
-    -i "$key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
-    git@github.com >/dev/null 2>&1
+
+  # GitHub returns exit code 1 even on successful auth, so parse output.
+  out="$(sudo -u "$user" ssh \
+    -i "$key" \
+    -o IdentitiesOnly=yes \
+    -o BatchMode=yes \
+    -o StrictHostKeyChecking=accept-new \
+    -o ConnectTimeout=5 \
+    -T git@github.com 2>&1 || true)"
+
+  # Success pattern from GitHub
+  echo "$out" | grep -qi "successfully authenticated"
 }
 
 install_dotfiles() {
