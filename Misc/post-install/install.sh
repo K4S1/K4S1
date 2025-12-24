@@ -26,6 +26,9 @@ DOTFILES_REPO="git@github.com:K4S1/thedot.git"
 DOTFILES_DIR_NAME=".thedot"             # ~/.thedot (git --bare)
 DOTFILES_KEY_NAME="github"              # ~/.ssh/github (ed25519)
 
+# ----------------------------
+# Logging helpers
+# ----------------------------
 log()  { printf "\033[1;34m[INFO]\033[0m %s\n" "$*"; }
 warn() { printf "\033[1;33m[WARN]\033[0m %s\n" "$*"; }
 err()  { printf "\033[1;31m[ERR ]\033[0m %s\n" "$*"; }
@@ -47,6 +50,9 @@ need_root() {
 
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
 
+# ----------------------------
+# Environment detection
+# ----------------------------
 is_wsl() {
   grep -qiE "microsoft|wsl" /proc/sys/kernel/osrelease 2>/dev/null || \
   grep -qiE "microsoft|wsl" /proc/version 2>/dev/null
@@ -85,7 +91,7 @@ detect_os_id() {
 }
 
 # ----------------------------
-# Package lists
+# Package lists (mapped per distro)
 # ----------------------------
 APT_BASE_PKGS=( curl wget git vim tmux unzip zip ca-certificates gnupg tree jq ripgrep dialog )
 PACMAN_BASE_PKGS=( curl wget git vim tmux unzip zip ca-certificates gnupg tree jq ripgrep dialog )
@@ -105,6 +111,9 @@ PACMAN_NET_PKGS=( bind nmap mtr speedtest-cli )
 APT_EXTRAS_PKGS=( htop bpytop speedometer )
 PACMAN_EXTRAS_PKGS=( htop bpytop speedometer )
 
+# ----------------------------
+# Package manager functions
+# ----------------------------
 apt_update() { run "export DEBIAN_FRONTEND=noninteractive; apt-get update -y"; }
 apt_install() { run "export DEBIAN_FRONTEND=noninteractive; apt-get install -y --no-install-recommends $*"; }
 
@@ -112,7 +121,7 @@ pacman_update() { run "pacman -Syu --noconfirm"; }
 pacman_install() { run "pacman -S --noconfirm --needed $*"; }
 
 # ----------------------------
-# Menu helpers (robust parsing)
+# Menu (robust parsing, Cancel=exit)
 # ----------------------------
 set_all_off() {
   INSTALL_BASE=0 INSTALL_FD=0 INSTALL_EDITOR=0 INSTALL_DEV=0 INSTALL_NETTOOLS=0 INSTALL_EXTRAS=0 INSTALL_DOCKER=0 INSTALL_DOTFILES=0
@@ -135,7 +144,7 @@ enable_if_selected() {
 menu_select_components() {
   [[ "$NONINTERACTIVE" == "1" ]] && return 0
 
-  # Need stdin TTY for arrows/space
+  # Need stdin TTY for arrows/space. If no TTY, fall back to non-interactive defaults.
   if [[ ! -t 0 ]]; then
     warn "Ingen TTY til menu (typisk ved 'curl | bash'). Skifter til NONINTERACTIVE=1."
     NONINTERACTIVE=1
@@ -149,6 +158,7 @@ menu_select_components() {
   local output="" status=0
 
   if have_cmd dialog; then
+    # FIX: Do NOT redirect stdout away; we need it for output capture.
     set +e
     output=$(
       dialog --title "Post-install" --checklist \
@@ -163,12 +173,12 @@ menu_select_components() {
         DOCKER   "Docker (tilvalg)" off \
         DOTFILES "Dotfiles (~/.thedot via SSH-key ~/.ssh/github)" off \
         --stdout \
-        </dev/tty >/dev/tty
+        </dev/tty 2>/dev/tty
     )
     status=$?
     set -e
 
-    # dialog exit codes: 0=OK, 1=Cancel, 255=ESC
+    # dialog: 0=OK, 1=Cancel, 255=ESC
     if [[ $status -ne 0 ]]; then
       warn "Bruger annullerede installationen."
       exit 0
@@ -189,28 +199,24 @@ menu_select_components() {
         DOCKER   "Docker (tilvalg)" OFF \
         DOTFILES "Dotfiles (~/.thedot via SSH-key ~/.ssh/github)" OFF \
         3>&1 1>&2 2>&3 \
-        </dev/tty >/dev/tty
+        </dev/tty
     )
     status=$?
     set -e
 
-    # whiptail exit codes: 0=OK, 1=Cancel, 255=ESC
     if [[ $status -ne 0 ]]; then
       warn "Bruger annullerede installationen."
       exit 0
     fi
+
   else
     warn "Hverken dialog eller whiptail er tilgængelig. Skifter til NONINTERACTIVE=1."
     NONINTERACTIVE=1
     return 0
   fi
 
-  # Parse output robustly:
-  # dialog returns: BASE FD ... (quoted or unquoted depending on version)
-  # whiptail returns: "BASE" "FD" ... (quoted)
+  # Apply selections
   set_all_off
-
-  # remove quotes and split by whitespace
   output="${output//\"/}"
   for item in $output; do
     enable_if_selected "$item"
@@ -295,7 +301,7 @@ install_docker_arch() {
 }
 
 # ----------------------------
-# Dotfiles (optional)
+# Dotfiles (optional) via ~/.ssh/github
 # ----------------------------
 has_github_ssh_key() {
   local user="$1" home ssh_dir priv pub
