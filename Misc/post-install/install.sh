@@ -22,6 +22,8 @@ COMMON_PKGS=(
   ripgrep
   speedtest-cli
   speedometer
+  mtr
+  nmap
 )
 
 # Ubuntu-only additions (names in apt)
@@ -29,8 +31,8 @@ UBUNTU_PKGS=(
   build-essential
   python3
   python3-pip
-  dnsutils 
-  fd-find 
+  dnsutils
+  fd-find
   neovim
 )
 
