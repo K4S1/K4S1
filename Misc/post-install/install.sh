@@ -107,15 +107,23 @@ ensure_sudo_user_home() {
 # ----------------------------
 prompt_yn() {
   local q="$1" var="$2" ans
-  read -r -p "${q} [Y/n] " ans || true
+  read -r -p "${q} [Y/n] " ans </dev/tty || true
   case "${ans,,}" in
     n|no) printf -v "$var" "0" ;;
     *)    printf -v "$var" "1" ;;
   esac
 }
 
+
 menu_select_components() {
   [[ "$NONINTERACTIVE" == "1" ]] && return 0
+
+  # Hvis vi ikke har en TTY, kan whiptail ikke køre korrekt (typisk ved curl | bash)
+  if [[ ! -t 0 && ! -t 1 ]]; then
+    warn "Ingen TTY til menu (typisk ved 'curl | bash'). Sætter NONINTERACTIVE=1."
+    NONINTERACTIVE=1
+    return 0
+  fi
 
   if have_cmd whiptail; then
     local choices
@@ -128,8 +136,8 @@ menu_select_components() {
       "NETTOOLS" "dns tools + nmap + mtr + speedtest" ON \
       "EXTRAS"   "ekstra (htop/bpytop/speedometer...)" OFF \
       "DOCKER"   "Docker (tilvalg)" OFF \
-      "DOTFILES" "Dotfiles (~/.thedot via GitHub SSH-key ~/.ssh/github)" OFF \
-      3>&1 1>&2 2>&3) || return 0
+      "DOTFILES" "Dotfiles (~/.thedot via SSH-key ~/.ssh/github)" OFF \
+      3>&1 1>&2 2>&3 </dev/tty ) || return 0
 
     INSTALL_BASE=0 INSTALL_FD=0 INSTALL_EDITOR=0 INSTALL_DEV=0 INSTALL_NETTOOLS=0 INSTALL_EXTRAS=0 INSTALL_DOCKER=0 INSTALL_DOTFILES=0
     [[ "$choices" == *"BASE"* ]]     && INSTALL_BASE=1
@@ -143,16 +151,17 @@ menu_select_components() {
     return 0
   fi
 
-  # Fallback prompts
-  prompt_yn "Installér BASE?"     INSTALL_BASE
-  prompt_yn "Installér FD?"       INSTALL_FD
-  prompt_yn "Installér EDITOR?"   INSTALL_EDITOR
-  prompt_yn "Installér DEV?"      INSTALL_DEV
-  prompt_yn "Installér NETTOOLS?" INSTALL_NETTOOLS
-  prompt_yn "Installér EXTRAS?"   INSTALL_EXTRAS
-  prompt_yn "Installér DOCKER?"   INSTALL_DOCKER
-  prompt_yn "Installér DOTFILES?" INSTALL_DOTFILES
+  # Fallback prompts på TTY
+  prompt_yn "Installér BASE?"     INSTALL_BASE </dev/tty
+  prompt_yn "Installér FD?"       INSTALL_FD </dev/tty
+  prompt_yn "Installér EDITOR?"   INSTALL_EDITOR </dev/tty
+  prompt_yn "Installér DEV?"      INSTALL_DEV </dev/tty
+  prompt_yn "Installér NETTOOLS?" INSTALL_NETTOOLS </dev/tty
+  prompt_yn "Installér EXTRAS?"   INSTALL_EXTRAS </dev/tty
+  prompt_yn "Installér DOCKER?"   INSTALL_DOCKER </dev/tty
+  prompt_yn "Installér DOTFILES?" INSTALL_DOTFILES </dev/tty
 }
+
 
 print_plan() {
   local distro="$1" wsl="$2"
